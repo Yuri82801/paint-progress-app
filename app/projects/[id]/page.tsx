@@ -276,28 +276,55 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     redirect("/login");
   }
 
-  const { data: project, error: projectError } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [
+    projectResult,
+    groupsResult,
+    progressResult,
+    workersResult,
+  ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .single(),
 
-  const { data: progressGroups, error: groupsError } = await supabase
-    .from("progress_groups")
-    .select("*")
-    .eq("project_id", id)
-    .order("sort_order", { ascending: true });
+    supabase
+      .from("progress_groups")
+      .select("*")
+      .eq("project_id", id)
+      .order("sort_order", { ascending: true }),
 
-  const { data: progressItems, error: progressError } = await supabase
-    .from("progress_items")
-    .select("*")
-    .eq("project_id", id)
-    .order("sort_order", { ascending: true });
+    supabase
+      .from("progress_items")
+      .select("*")
+      .eq("project_id", id)
+      .order("sort_order", { ascending: true }),
 
-  const { data: workers, error: workersError } = await supabase
-    .from("workers")
-    .select("*")
-    .order("name", { ascending: true });
+    supabase
+      .from("workers")
+      .select("*")
+      .order("name", { ascending: true }),
+  ]);
+
+  const {
+    data: project,
+    error: projectError,
+  } = projectResult;
+
+  const {
+    data: progressGroups,
+    error: groupsError,
+  } = groupsResult;
+
+  const {
+    data: progressItems,
+    error: progressError,
+  } = progressResult;
+
+  const {
+    data: workers,
+    error: workersError,
+  } = workersResult;
 
   if (projectError || groupsError || progressError || workersError) {
     return (
