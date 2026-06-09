@@ -31,6 +31,12 @@ export default function ProgressStatusButtons({
   const supabase = createClient();
 
   const [selectedWorker, setSelectedWorker] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [localStatus, setLocalStatus] = useState<string | null>(currentStatus);
+
+  useEffect(() => {
+    setLocalStatus(currentStatus);
+  }, [currentStatus]);
 
   useEffect(() => {
     const savedWorker = localStorage.getItem("selected_worker") ?? "";
@@ -87,6 +93,10 @@ export default function ProgressStatusButtons({
   };
 
   const updateStatus = async (status: string) => {
+    if (updatingStatus) return;
+
+    const previousStatus = localStatus;
+
     const completedDate =
       status === "完了" ? new Date().toISOString().slice(0, 10) : null;
 
@@ -96,6 +106,9 @@ export default function ProgressStatusButtons({
       alert("画面上部で作業者を選択してください");
       return;
     }
+
+    setUpdatingStatus(status);
+    setLocalStatus(status);
 
     const { error } = await supabase
       .from("progress_items")
@@ -107,11 +120,15 @@ export default function ProgressStatusButtons({
       .eq("id", itemId);
 
     if (error) {
+      setLocalStatus(previousStatus);
+      setUpdatingStatus(null);
       alert("更新に失敗しました：" + error.message);
       return;
     }
 
     await updateProjectStatus();
+
+    setUpdatingStatus(null);
 
     router.refresh();
   };
@@ -123,13 +140,14 @@ export default function ProgressStatusButtons({
           key={status}
           type="button"
           onClick={() => updateStatus(status)}
-          className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm transition active:scale-95 sm:min-h-9 sm:px-3 sm:py-1 ${
-            currentStatus === status
+          disabled={!!updatingStatus}
+          className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-9 sm:px-3 sm:py-1 ${
+            localStatus === status
               ? "border-black bg-black text-white"
               : "border-gray-300 bg-white text-gray-700"
           }`}
         >
-          {status}
+          {updatingStatus === status ? "更新中..." : status}
         </button>
       ))}
     </div>
