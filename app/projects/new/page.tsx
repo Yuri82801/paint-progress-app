@@ -3,6 +3,12 @@ import { taskTemplates } from "@/lib/taskTemplates";
 import { redirect } from "next/navigation";
 import NewProjectForm from "./NewProjectForm";
 
+type ProgressGroup = {
+  id: string;
+  category: keyof typeof taskTemplates;
+  section_name: string | null;
+};
+
 async function createProject(formData: FormData) {
   "use server";
 
@@ -35,24 +41,46 @@ async function createProject(formData: FormData) {
   }
 
   if (rows.length > 0) {
-    const progressItems = rows.flatMap((row) => {
-      const template = taskTemplates[row.category];
+    const groupRows = rows.map((row, index) => ({
+      project_id: project.id,
+      category: row.category,
+      section_name: row.section_name || null,
+      sort_order: index + 1,
+    }));
+
+    const { data: insertedGroups, error: groupError } = await supabase
+      .from("progress_groups")
+      .insert(groupRows)
+      .select("id, category, section_name");
+
+    if (groupError) {
+      throw new Error(groupError.message);
+    }
+
+    const groupList = (insertedGroups as ProgressGroup[]) ?? [];
+
+    const progressItems = groupList.flatMap((group) => {
+      const template = taskTemplates[group.category];
 
       return template.map((taskName, index) => ({
         project_id: project.id,
-        category: row.category,
-        section_name: row.section_name || null,
+        group_id: group.id,
+        category: group.category,
+        section_name: group.section_name,
         task_name: taskName,
+        status: "未着手",
         sort_order: index + 1,
       }));
     });
 
-    const { error: progressError } = await supabase
-      .from("progress_items")
-      .insert(progressItems);
+    if (progressItems.length > 0) {
+      const { error: progressError } = await supabase
+        .from("progress_items")
+        .insert(progressItems);
 
-    if (progressError) {
-      throw new Error(progressError.message);
+      if (progressError) {
+        throw new Error(progressError.message);
+      }
     }
   }
 

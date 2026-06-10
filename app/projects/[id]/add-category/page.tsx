@@ -9,6 +9,12 @@ type PageProps = {
   }>;
 };
 
+type ProgressGroup = {
+  id: string;
+  category: keyof typeof taskTemplates;
+  section_name: string | null;
+};
+
 async function addCategories(projectId: string, formData: FormData) {
   "use server";
 
@@ -20,24 +26,60 @@ async function addCategories(projectId: string, formData: FormData) {
     section_name: string;
   }[];
 
-  const progressItems = rows.flatMap((row) => {
-    const template = taskTemplates[row.category];
+  if (rows.length === 0) {
+    redirect(`/projects/${projectId}`);
+  }
+
+  const { data: latestGroup } = await supabase
+    .from("progress_groups")
+    .select("sort_order")
+    .eq("project_id", projectId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+
+  const latestSortOrder =
+    ((latestGroup?.[0]?.sort_order as number | null) ?? 0) + 1;
+
+  const groupRows = rows.map((row, index) => ({
+    project_id: projectId,
+    category: row.category,
+    section_name: row.section_name || null,
+    sort_order: latestSortOrder + index,
+  }));
+
+  const { data: insertedGroups, error: groupError } = await supabase
+    .from("progress_groups")
+    .insert(groupRows)
+    .select("id, category, section_name");
+
+  if (groupError) {
+    throw new Error(groupError.message);
+  }
+
+  const groupList = (insertedGroups as ProgressGroup[]) ?? [];
+
+  const progressItems = groupList.flatMap((group) => {
+    const template = taskTemplates[group.category];
 
     return template.map((taskName, index) => ({
       project_id: projectId,
-      category: row.category,
-      section_name: row.section_name || null,
+      group_id: group.id,
+      category: group.category,
+      section_name: group.section_name,
       task_name: taskName,
+      status: "未着手",
       sort_order: index + 1,
     }));
   });
 
-  const { error } = await supabase
-    .from("progress_items")
-    .insert(progressItems);
+  if (progressItems.length > 0) {
+    const { error: itemsError } = await supabase
+      .from("progress_items")
+      .insert(progressItems);
 
-  if (error) {
-    throw new Error(error.message);
+    if (itemsError) {
+      throw new Error(itemsError.message);
+    }
   }
 
   redirect(`/projects/${projectId}`);
