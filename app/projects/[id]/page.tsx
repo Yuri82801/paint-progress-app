@@ -361,17 +361,15 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     workerList.map((worker) => [worker.id, worker.name])
   );
 
-  const groupsWithItems = groupList
-    .map((group) => ({
-      id: group.id,
-      category: group.category,
-      section_name: group.section_name,
-      sort_order: group.sort_order,
-      items: progressItemList
-        .filter((item) => item.group_id === group.id)
-        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
-    }))
-    .filter((group) => group.items.length > 0);
+  const groupsWithItems = groupList.map((group) => ({
+    id: group.id,
+    category: group.category,
+    section_name: group.section_name,
+    sort_order: group.sort_order,
+    items: progressItemList
+      .filter((item) => item.group_id === group.id)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+  }));
 
   return (
     <main className="min-h-screen bg-gray-100 p-4 sm:p-8">
