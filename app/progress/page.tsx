@@ -14,6 +14,10 @@ type ProgressItem = {
   sort_order: number | null;
 };
 
+type SiteAssignment = {
+  work_amount: number;
+};
+
 type Project = {
   id: string;
   name: string;
@@ -24,6 +28,7 @@ type Project = {
   start_date: string | null;
   end_date: string | null;
   progress_items: ProgressItem[];
+  site_assignments: SiteAssignment[];
 };
 
 function getGroupName(item: ProgressItem) {
@@ -210,6 +215,9 @@ export default async function ProgressPage() {
         completed_date,
         completed_by,
         sort_order
+      ),
+      site_assignments (
+        work_amount
       )
     `)
     .eq("status", "作業中")
@@ -252,7 +260,7 @@ export default async function ProgressPage() {
             <PrintButton />
 
             <Link
-              href="/"
+              href="/projects"
               className="rounded bg-gray-700 px-4 py-2 text-center font-medium text-white hover:bg-gray-800"
             >
               工事一覧に戻る
@@ -285,6 +293,11 @@ export default async function ProgressPage() {
               if (categoryCompare !== 0) return categoryCompare;
               return (a.sort_order ?? 0) - (b.sort_order ?? 0);
             });
+
+            const totalManDays = (project.site_assignments ?? []).reduce(
+              (sum, assignment) => sum + Number(assignment.work_amount),
+              0
+            );
 
             const total = items.length;
 
@@ -334,10 +347,18 @@ export default async function ProgressPage() {
                       {project.manager ? `　/　担当：${project.manager}` : ""}
                     </p>
 
+                    <p className="mt-2 text-sm font-semibold text-gray-600">
+                      累計人工：
+                      <span className="ml-1 text-3xl font-bold text-red-600 print:text-2xl">
+                        {totalManDays}
+                      </span>
+                      <span className="ml-0.5 text-xs text-red-600">人工</span>
+                    </p>
+
                     <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2 print:border print:border-gray-400">
-                        <p className="font-medium text-base text-gray-700 print:text-sm">
-                            📍 {project.address ?? "未入力"}
-                        </p>
+                      <p className="text-base font-medium text-gray-700 print:text-sm">
+                        📍 {project.address ?? "未入力"}
+                      </p>
                     </div>
                   </div>
 

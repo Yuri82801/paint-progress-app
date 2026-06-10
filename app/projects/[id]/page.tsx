@@ -33,6 +33,13 @@ type Worker = {
   name: string;
 };
 
+type SiteAssignment = {
+  id: string;
+  worker_id: string;
+  work_date: string;
+  work_amount: number;
+};
+
 type PageProps = {
   params: Promise<{
     id: string;
@@ -242,11 +249,8 @@ async function updateCompletedInfo(formData: FormData) {
   const projectId = formData.get("project_id") as string;
   const itemId = formData.get("item_id") as string;
 
-  const completedDate =
-    (formData.get("completed_date") as string) || null;
-
-  const completedBy =
-    (formData.get("completed_by") as string) || null;
+  const completedDate = (formData.get("completed_date") as string) || null;
+  const completedBy = (formData.get("completed_by") as string) || null;
 
   const { error } = await supabase
     .from("progress_items")
@@ -281,12 +285,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     groupsResult,
     progressResult,
     workersResult,
+    siteAssignmentsResult,
   ] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("*")
-      .eq("id", id)
-      .single(),
+    supabase.from("projects").select("*").eq("id", id).single(),
 
     supabase
       .from("progress_groups")
@@ -300,40 +301,37 @@ export default async function ProjectDetailPage({ params }: PageProps) {
       .eq("project_id", id)
       .order("sort_order", { ascending: true }),
 
+    supabase.from("workers").select("*").order("name", { ascending: true }),
+
     supabase
-      .from("workers")
-      .select("*")
-      .order("name", { ascending: true }),
+      .from("site_assignments")
+      .select("id, worker_id, work_date, work_amount")
+      .eq("project_id", id)
+      .order("work_date", { ascending: false }),
   ]);
 
-  const {
-    data: project,
-    error: projectError,
-  } = projectResult;
+  const { data: project, error: projectError } = projectResult;
+  const { data: progressGroups, error: groupsError } = groupsResult;
+  const { data: progressItems, error: progressError } = progressResult;
+  const { data: workers, error: workersError } = workersResult;
+  const { data: siteAssignments, error: siteAssignmentsError } =
+    siteAssignmentsResult;
 
-  const {
-    data: progressGroups,
-    error: groupsError,
-  } = groupsResult;
-
-  const {
-    data: progressItems,
-    error: progressError,
-  } = progressResult;
-
-  const {
-    data: workers,
-    error: workersError,
-  } = workersResult;
-
-  if (projectError || groupsError || progressError || workersError) {
+  if (
+    projectError ||
+    groupsError ||
+    progressError ||
+    workersError ||
+    siteAssignmentsError
+  ) {
     return (
       <main className="p-8">
         エラー：
         {projectError?.message ||
           groupsError?.message ||
           progressError?.message ||
-          workersError?.message}
+          workersError?.message ||
+          siteAssignmentsError?.message}
       </main>
     );
   }
@@ -341,6 +339,27 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const groupList = (progressGroups as ProgressGroup[]) ?? [];
   const progressItemList = (progressItems as ProgressItem[]) ?? [];
   const workerList = (workers as Worker[]) ?? [];
+  const siteAssignmentList = (siteAssignments as SiteAssignment[]) ?? [];
+
+  const totalManDays = siteAssignmentList.reduce(
+    (sum, assignment) => sum + Number(assignment.work_amount),
+    0
+  );
+
+  const siteAssignmentsByDate = siteAssignmentList.reduce<
+    Record<string, SiteAssignment[]>
+  >((acc, assignment) => {
+    if (!acc[assignment.work_date]) {
+      acc[assignment.work_date] = [];
+    }
+
+    acc[assignment.work_date].push(assignment);
+    return acc;
+  }, {});
+
+  const workerNameMap = new Map(
+    workerList.map((worker) => [worker.id, worker.name])
+  );
 
   const groupsWithItems = groupList
     .map((group) => ({
@@ -357,7 +376,7 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-gray-100 p-4 sm:p-8">
       <Link
-        href="/"
+        href="/projects"
         className="inline-block rounded bg-gray-700 px-4 py-2 font-medium text-white hover:bg-gray-800"
       >
         ← 工事一覧に戻る
@@ -392,6 +411,41 @@ export default async function ProjectDetailPage({ params }: PageProps) {
         <p>住所：{project.address || "未入力"}</p>
         <p>担当者：{project.manager || "未入力"}</p>
         <p>ステータス：{project.status || "未入力"}</p>
+        <p className="font-bold text-red-600">累計人工：{totalManDays}人工</p>
+      </div>
+
+      <div className="mb-6 rounded-lg border bg-white p-4 text-gray-700 shadow-sm">
+        <h2 className="mb-3 text-lg font-bold text-gray-900">現場担当履歴</h2>
+
+        {siteAssignmentList.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            まだ現場担当の記録はありません。
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {Object.entries(siteAssignmentsByDate).map(([date, assignments]) => (
+              <div key={date} className="rounded border border-gray-200 p-3">
+                <p className="font-bold text-gray-900">
+                  {Number(date.slice(5, 7))}月{Number(date.slice(8, 10))}日
+                </p>
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {assignments.map((assignment) => (
+                    <span
+                      key={assignment.id}
+                      className="rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-800"
+                    >
+                      {workerNameMap.get(assignment.worker_id) ?? "不明な職人"}
+                      （
+                      {Number(assignment.work_amount) === 0.5 ? "半日" : "1日"}
+                      ）
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <WorkerSelector workers={workerList} />

@@ -16,6 +16,7 @@ type Project = {
   manager: string | null;
   status: string | null;
   progress_items: ProgressItem[];
+  totalManDays?: number;
 };
 
 type Props = {
@@ -133,6 +134,7 @@ export default function ProjectsList({ projects }: Props) {
 
         {filteredProjects.map((project) => {
           const progress = calculateProgress(project.progress_items ?? []);
+          const totalManDays = project.totalManDays ?? 0;
 
           return (
             <Link
@@ -154,6 +156,16 @@ export default function ProjectsList({ projects }: Props) {
 
                   <p className="mt-1 text-sm text-gray-600">
                     担当：{project.manager || "未設定"}
+                  </p>
+
+                  <p className="mt-2 text-sm font-semibold text-gray-600">
+                    累計人工：
+                    <span className="ml-1 text-2xl font-bold text-red-600">
+                      {totalManDays}
+                    </span>
+                    <span className="ml-0.5 text-xs text-red-600">
+                      人工
+                    </span>
                   </p>
                 </div>
 

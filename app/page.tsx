@@ -1,134 +1,45 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import ProjectsList from "./projects/ProjectsList";
-import LogoutButton from "./LogoutButton";
 
-type ProgressItem = {
-  id: string;
-  status: string | null;
-};
-
-type Project = {
-  id: string;
-  name: string;
-  customer_name: string | null;
-  address: string | null;
-  manager: string | null;
-  status: string | null;
-  progress_items: ProgressItem[];
-};
-
-export default async function HomePage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const isAdmin = profile?.role === "admin";
-
-  const { data: projects, error } = await supabase
-    .from("projects")
-    .select(`
-      id,
-      name,
-      customer_name,
-      address,
-      manager,
-      status,
-      progress_items (
-        id,
-        status
-      )
-    `)
-    .order("start_date", { ascending: true, nullsFirst: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const projectList = (projects as Project[]) ?? [];
-
-  const beforeCount = projectList.filter(
-    (project) =>
-      project.status === "未着手" || project.status === "着工待ち"
-  ).length;
-
-  const workingCount = projectList.filter(
-    (project) => project.status === "作業中"
-  ).length;
-
-  const completedCount = projectList.filter(
-    (project) => project.status === "完了"
-  ).length;
-
+export default function HomePage() {
   return (
-    <main className="p-4">
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-end gap-3">
-          <h1 className="text-3xl font-bold">工事一覧</h1>
-          <span className="pb-1 text-sm text-gray-500">
-            株式会社幸和塗装
-          </span>
-        </div>
+    <main className="min-h-screen bg-gray-50 p-4">
+      <div className="mx-auto flex min-h-[80vh] max-w-3xl flex-col items-center justify-center">
+        <div className="w-full rounded-2xl bg-white p-6 shadow-sm sm:p-10">
+          <h1 className="text-2xl font-bold text-gray-900">
+            メニュー
+          </h1>
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Link
-            href="/progress"
-            className="rounded bg-green-600 px-4 py-2 text-center text-white"
-          >
-            進捗一覧
-          </Link>
+          <p className="mt-2 text-sm text-gray-600">
+            使用する機能を選択してください。
+          </p>
 
-          {isAdmin && (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <Link
-              href="/settings"
-              className="rounded bg-gray-700 px-4 py-2 text-center text-white"
+              href="/projects"
+              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              設定
+              <p className="text-lg font-bold text-gray-900">
+                工事進捗管理
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                工事一覧・工程管理・進捗確認を行います。
+              </p>
             </Link>
-          )}
 
-          <Link
-            href="/projects/new"
-            className="rounded bg-blue-600 px-4 py-2 text-center text-white"
-          >
-            新規工事登録
-          </Link>
-
-          <LogoutButton />
+            <Link
+              href="/site-assignments/new"
+              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-lg font-bold text-gray-900">
+                現場担当入力
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                日ごとに、どの現場に誰が入ったかを記録します。
+              </p>
+            </Link>
+          </div>
         </div>
       </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded border bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">施工前</p>
-          <p className="text-2xl font-bold">{beforeCount}件</p>
-        </div>
-
-        <div className="rounded border bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">施工中</p>
-          <p className="text-2xl font-bold">{workingCount}件</p>
-        </div>
-
-        <div className="rounded border bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">完了済み</p>
-          <p className="text-2xl font-bold">{completedCount}件</p>
-        </div>
-      </div>
-
-      <ProjectsList projects={projectList} />
     </main>
   );
 }
