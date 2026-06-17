@@ -26,7 +26,11 @@ async function createProject(formData: FormData) {
     .insert({
       name: formData.get("name"),
       customer_name: formData.get("customer_name"),
+      phone_number: formData.get("phone_number") || null,
       address: formData.get("address"),
+      parking_count: formData.get("parking_count")
+      ? Number(formData.get("parking_count"))
+      : null,
       manager: formData.get("manager"),
       start_date: formData.get("start_date") || null,
       end_date: formData.get("end_date") || null,

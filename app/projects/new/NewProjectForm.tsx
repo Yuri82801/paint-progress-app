@@ -67,36 +67,74 @@ export default function NewProjectForm({ createProject }: Props) {
   return (
     <form action={createProject} className="space-y-6">
       <section className="space-y-3">
-        <input name="name" placeholder="工事名" className="w-full rounded border p-2" required />
-        <input name="customer_name" placeholder="顧客名" className="w-full rounded border p-2" />
-        <input name="address" placeholder="住所" className="w-full rounded border p-2" />
-        <input name="manager" placeholder="担当者" className="w-full rounded border p-2" />
+        <input
+          name="name"
+          placeholder="工事名"
+          className="w-full rounded border p-2"
+          required
+        />
+
+        <input
+          name="customer_name"
+          placeholder="顧客名"
+          className="w-full rounded border p-2"
+        />
+
+        <input
+          name="phone_number"
+          placeholder="電話番号"
+          className="w-full rounded border p-2"
+        />
+
+        <input
+          name="address"
+          placeholder="住所"
+          className="w-full rounded border p-2"
+        />
+
+        <input
+          name="parking_count"
+          type="number"
+          min="0"
+          placeholder="駐車可能台数"
+          className="w-full rounded border p-2"
+        />
+
+        <input
+          name="manager"
+          placeholder="担当者"
+          className="w-full rounded border p-2"
+        />
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-  <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
-        着工予定日
-      </label>
-      <input
-        type="date"
-        name="start_date"
-        className="w-full rounded border p-2"
-      />
-    </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              着工予定日
+            </label>
+            <input
+              type="date"
+              name="start_date"
+              className="w-full rounded border p-2"
+            />
+          </div>
 
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
-        完工予定日
-      </label>
-      <input
-        type="date"
-        name="end_date"
-        className="w-full rounded border p-2"
-      />
-    </div>
-  </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              完工予定日
+            </label>
+            <input
+              type="date"
+              name="end_date"
+              className="w-full rounded border p-2"
+            />
+          </div>
+        </div>
 
-        <textarea name="memo" placeholder="メモ" className="w-full rounded border p-2" />
+        <textarea
+          name="memo"
+          placeholder="メモ"
+          className="w-full rounded border p-2"
+        />
       </section>
 
       <section className="space-y-3">
@@ -105,11 +143,18 @@ export default function NewProjectForm({ createProject }: Props) {
         <input type="hidden" name="rows" value={JSON.stringify(rows)} />
 
         {rows.map((row, index) => (
-          <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <div
+            key={index}
+            className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]"
+          >
             <select
               value={row.category}
               onChange={(e) =>
-                updateRow(index, "category", e.target.value as keyof typeof taskTemplates)
+                updateRow(
+                  index,
+                  "category",
+                  e.target.value as keyof typeof taskTemplates
+                )
               }
               className="rounded border p-2"
             >

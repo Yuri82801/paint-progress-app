@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 type PageProps = {
   params: Promise<{
@@ -17,7 +18,11 @@ async function updateProject(projectId: string, formData: FormData) {
     .update({
       name: formData.get("name"),
       customer_name: formData.get("customer_name"),
+      phone_number: formData.get("phone_number") || null,
       address: formData.get("address"),
+      parking_count: formData.get("parking_count")
+        ? Number(formData.get("parking_count"))
+        : null,
       manager: formData.get("manager"),
       start_date: formData.get("start_date") || null,
       end_date: formData.get("end_date") || null,
@@ -57,10 +62,10 @@ export default async function EditProjectPage({ params }: PageProps) {
   }
 
   return (
-    <main className="p-8">
-      <a href={`/projects/${id}`} className="text-blue-600 underline">
+    <main className="p-4 sm:p-8">
+      <Link href={`/projects/${id}`} className="text-blue-600 underline">
         ← 工事詳細に戻る
-      </a>
+      </Link>
 
       <h1 className="mt-4 mb-6 text-3xl font-bold">工事情報編集</h1>
 
@@ -85,10 +90,30 @@ export default async function EditProjectPage({ params }: PageProps) {
         </div>
 
         <div>
+          <label className="mb-1 block font-bold">電話番号</label>
+          <input
+            name="phone_number"
+            defaultValue={project.phone_number ?? ""}
+            className="w-full rounded border p-2"
+          />
+        </div>
+
+        <div>
           <label className="mb-1 block font-bold">住所</label>
           <input
             name="address"
             defaultValue={project.address ?? ""}
+            className="w-full rounded border p-2"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block font-bold">駐車可能台数</label>
+          <input
+            type="number"
+            min="0"
+            name="parking_count"
+            defaultValue={project.parking_count ?? ""}
             className="w-full rounded border p-2"
           />
         </div>
@@ -110,13 +135,14 @@ export default async function EditProjectPage({ params }: PageProps) {
             className="w-full rounded border p-2"
           >
             <option value="未着手">未着手</option>
+            <option value="着工待ち">着工待ち</option>
             <option value="作業中">作業中</option>
             <option value="完了">完了</option>
             <option value="対象外">対象外</option>
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block font-bold">着工予定日</label>
             <input

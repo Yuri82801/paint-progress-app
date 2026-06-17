@@ -406,7 +406,14 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
       <div className="mb-6 rounded-lg border bg-white p-4 text-gray-700 shadow-sm">
         <p>顧客名：{project.customer_name || "未入力"}</p>
+        <p>電話番号：{project.phone_number || "未入力"}</p>
         <p>住所：{project.address || "未入力"}</p>
+        <p>
+          駐車可能台数：
+          {project.parking_count !== null && project.parking_count !== undefined
+            ? `${project.parking_count}台`
+            : "未入力"}
+        </p>
         <p>担当者：{project.manager || "未入力"}</p>
         <p>ステータス：{project.status || "未入力"}</p>
         <p className="font-bold text-red-600">累計人工：{totalManDays}人工</p>
