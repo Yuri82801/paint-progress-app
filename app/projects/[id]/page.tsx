@@ -5,6 +5,7 @@ import ProgressItemGroup from "./ProgressItemGroup";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import WorkerSelector from "./WorkerSelector";
+import PaintUsageForm from "./PaintUsageForm";
 
 type ProgressItem = {
   id: string;
@@ -267,6 +268,124 @@ async function updateCompletedInfo(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
 }
 
+async function addPaintUsage(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const projectId = String(formData.get("project_id") ?? "");
+  const paintInventoryId = String(formData.get("paint_inventory_id") ?? "");
+  const usedAmountText = String(formData.get("used_amount") ?? "");
+  const usedAll = formData.get("used_all") === "true";
+
+  if (!projectId || !paintInventoryId) return;
+
+  const { data: inventory, error: inventoryError } = await supabase
+    .from("paint_inventory")
+    .select("remaining_amount")
+    .eq("id", paintInventoryId)
+    .single();
+
+  if (inventoryError) {
+    throw new Error(inventoryError.message);
+  }
+
+  const currentRemaining = Number(inventory.remaining_amount);
+
+  const usedAmount = usedAll ? currentRemaining : Number(usedAmountText);
+
+  if (!usedAll && (!usedAmountText || usedAmount <= 0)) {
+    return;
+  }
+
+  const newRemaining = usedAll
+    ? 0
+    : Math.max(currentRemaining - usedAmount, 0);
+
+  const { error: logError } = await supabase.from("paint_usage_logs").insert({
+    project_id: projectId,
+    paint_inventory_id: paintInventoryId,
+    used_amount: usedAmount,
+    used_all: usedAll,
+    used_date: new Date().toISOString().slice(0, 10),
+  });
+
+  if (logError) {
+    throw new Error(logError.message);
+  }
+
+  const { error: updateError } = await supabase
+    .from("paint_inventory")
+    .update({
+      remaining_amount: newRemaining,
+    })
+    .eq("id", paintInventoryId);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/paint-inventory");
+}
+
+async function deletePaintUsage(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const projectId = String(formData.get("project_id") ?? "");
+  const usageLogId = String(formData.get("usage_log_id") ?? "");
+
+  if (!projectId || !usageLogId) return;
+
+  const { data: usageLog, error: usageLogError } = await supabase
+    .from("paint_usage_logs")
+    .select("id, paint_inventory_id, used_amount")
+    .eq("id", usageLogId)
+    .single();
+
+  if (usageLogError) {
+    throw new Error(usageLogError.message);
+  }
+
+  const { data: inventory, error: inventoryError } = await supabase
+    .from("paint_inventory")
+    .select("remaining_amount")
+    .eq("id", usageLog.paint_inventory_id)
+    .single();
+
+  if (inventoryError) {
+    throw new Error(inventoryError.message);
+  }
+
+  const restoredAmount =
+    Number(inventory.remaining_amount) + Number(usageLog.used_amount);
+
+  const { error: updateError } = await supabase
+    .from("paint_inventory")
+    .update({
+      remaining_amount: restoredAmount,
+    })
+    .eq("id", usageLog.paint_inventory_id);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  const { error: deleteError } = await supabase
+    .from("paint_usage_logs")
+    .delete()
+    .eq("id", usageLogId);
+
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/paint-inventory");
+}
+
 export default async function ProjectDetailPage({ params }: PageProps) {
   const { id } = await params;
 
@@ -286,29 +405,65 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     progressResult,
     workersResult,
     siteAssignmentsResult,
+    inventoryResult,
+    usageLogsResult,
   ] = await Promise.all([
-    supabase.from("projects").select("*").eq("id", id).single(),
+  supabase.from("projects").select("*").eq("id", id).single(),
 
-    supabase
-      .from("progress_groups")
-      .select("*")
-      .eq("project_id", id)
-      .order("sort_order", { ascending: true }),
+  supabase
+    .from("progress_groups")
+    .select("*")
+    .eq("project_id", id)
+    .order("sort_order", { ascending: true }),
 
-    supabase
-      .from("progress_items")
-      .select("*")
-      .eq("project_id", id)
-      .order("sort_order", { ascending: true }),
+  supabase
+    .from("progress_items")
+    .select("*")
+    .eq("project_id", id)
+    .order("sort_order", { ascending: true }),
 
-    supabase.from("workers").select("*").order("name", { ascending: true }),
+  supabase.from("workers").select("*").order("name", { ascending: true }),
 
-    supabase
-      .from("site_assignments")
-      .select("id, worker_id, work_date, work_amount")
-      .eq("project_id", id)
-      .order("work_date", { ascending: false }),
-  ]);
+  supabase
+    .from("site_assignments")
+    .select("id, worker_id, work_date, work_amount")
+    .eq("project_id", id)
+    .order("work_date", { ascending: false }),
+
+  supabase
+    .from("paint_inventory")
+    .select(`
+      id,
+      can_number,
+      color_name,
+      remaining_amount,
+      paint_products (
+        name
+      )
+    `)
+    .gt("remaining_amount", 0)
+    .order("can_number"),
+
+  supabase
+    .from("paint_usage_logs")
+    .select(`
+      id,
+      used_amount,
+      used_all,
+      used_date,
+      paint_inventory_id,
+      paint_inventory (
+        can_number,
+        color_name,
+        paint_products (
+          name
+        )
+      )
+    `)
+    .eq("project_id", id)
+    .order("used_date", { ascending: false }),
+
+]);
 
   const { data: project, error: projectError } = projectResult;
   const { data: progressGroups, error: groupsError } = groupsResult;
@@ -316,13 +471,19 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const { data: workers, error: workersError } = workersResult;
   const { data: siteAssignments, error: siteAssignmentsError } =
     siteAssignmentsResult;
+  const { data: inventory, error: inventoryError } =
+    inventoryResult;
+  const { data: usageLogs, error: usageLogsError } =
+    usageLogsResult;
 
   if (
     projectError ||
     groupsError ||
     progressError ||
     workersError ||
-    siteAssignmentsError
+    siteAssignmentsError ||
+    inventoryError ||
+    usageLogsError
   ) {
     return (
       <main className="p-8">
@@ -331,7 +492,9 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           groupsError?.message ||
           progressError?.message ||
           workersError?.message ||
-          siteAssignmentsError?.message}
+          siteAssignmentsError?.message ||
+          inventoryError?.message ||
+          usageLogsError?.message}
       </main>
     );
   }
@@ -340,6 +503,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const progressItemList = (progressItems as ProgressItem[]) ?? [];
   const workerList = (workers as Worker[]) ?? [];
   const siteAssignmentList = (siteAssignments as SiteAssignment[]) ?? [];
+  const inventoryList = inventory ?? [];
+  const usageLogList = usageLogs ?? [];
 
   const totalManDays = siteAssignmentList.reduce(
     (sum, assignment) => sum + Number(assignment.work_amount),
@@ -482,6 +647,57 @@ export default async function ProjectDetailPage({ params }: PageProps) {
           );
         })}
       </div>
+      <PaintUsageForm
+        projectId={id}
+        inventory={inventoryList as any}
+        addPaintUsage={addPaintUsage}
+      />
+      <section className="mt-6 rounded-lg border bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-lg font-bold">使用材料履歴</h2>
+
+        {usageLogList.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            まだ使用材料の記録はありません。
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {usageLogList.map((log: any) => (
+              <div
+                key={log.id}
+                className="rounded border border-gray-200 p-3 text-sm"
+              >
+                <p className="font-bold">
+                  {Number(log.used_date.slice(5, 7))}月
+                  {Number(log.used_date.slice(8, 10))}日
+                </p>
+
+                <p>
+                  No.{log.paint_inventory?.can_number} /{" "}
+                  {log.paint_inventory?.paint_products?.name} /{" "}
+                  {log.paint_inventory?.color_name || "色名なし"}
+                </p>
+
+                <p className="font-semibold text-blue-700">
+                  {log.used_all ? "使い切り" : `${log.used_amount}kg使用`}
+                </p>
+
+                <form action={deletePaintUsage} className="mt-2">
+                  <input type="hidden" name="project_id" value={id} />
+                  <input type="hidden" name="usage_log_id" value={log.id} />
+
+                  <button
+                    type="submit"
+                    className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white"
+                  >
+                    削除
+                  </button>
+                </form>
+
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }

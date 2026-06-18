@@ -37,6 +37,17 @@ export default function HomePage() {
                 日ごとに、どの現場に誰が入ったかを記録します。
               </p>
             </Link>
+            <Link
+              href="/paint-inventory"
+              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-lg font-bold text-gray-900">
+                在庫管理
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                塗料の在庫登録・残量確認を行います。
+              </p>
+            </Link>
           </div>
         </div>
       </div>
