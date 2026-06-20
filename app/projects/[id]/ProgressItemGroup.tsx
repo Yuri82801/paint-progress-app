@@ -45,6 +45,8 @@ type Props = {
   sectionName: string | null;
   items: ProgressItem[];
   workers: Worker[];
+  dragAttributes?: any;
+  dragListeners?: any;
   addProgressItem: (formData: FormData) => void;
   deleteItemGroup: (formData: FormData) => void;
   deleteProgressItem: (formData: FormData) => void;
@@ -177,7 +179,10 @@ function CompletedInfoEditor({
       </select>
 
       <div className="flex gap-2">
-        <button type="submit" className="rounded bg-blue-600 px-2 py-1 text-xs text-white">
+        <button
+          type="submit"
+          className="rounded bg-blue-600 px-2 py-1 text-xs text-white"
+        >
           保存
         </button>
         <button
@@ -234,7 +239,10 @@ function AddProgressItemForm({
           required
         />
 
-        <button type="submit" className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+        <button
+          type="submit"
+          className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+        >
           追加
         </button>
       </div>
@@ -275,7 +283,9 @@ function ProgressItemRowContent({
 
       <div className="space-y-2">
         <div className="text-xs text-gray-500 md:hidden">ステータス</div>
-        <span className={`inline-block rounded-full px-3 py-1 text-sm ${statusColor}`}>
+        <span
+          className={`inline-block rounded-full px-3 py-1 text-sm ${statusColor}`}
+        >
           {item.status}
         </span>
         <ProgressStatusButtons
@@ -334,7 +344,10 @@ function StaticProgressItemRow(props: {
 }) {
   return (
     <div className="grid grid-cols-1 gap-3 border-b bg-white py-3 md:grid-cols-[auto_1.2fr_1.4fr_1fr_1.4fr_auto] md:items-center md:gap-4">
-      <button type="button" className="w-full rounded bg-gray-200 px-3 py-2 text-sm font-bold text-gray-700 md:w-auto">
+      <button
+        type="button"
+        className="w-full rounded bg-gray-200 px-3 py-2 text-sm font-bold text-gray-700 md:w-auto"
+      >
         ☰
       </button>
       <ProgressItemRowContent {...props} />
@@ -350,8 +363,14 @@ function SortableProgressItemRow(props: {
   updateItemMemo: (formData: FormData) => void;
   updateCompletedInfo: (formData: FormData) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: props.item.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.item.id });
 
   return (
     <div
@@ -382,6 +401,8 @@ export default function ProgressItemGroup({
   sectionName,
   items,
   workers,
+  dragAttributes,
+  dragListeners,
   addProgressItem,
   deleteItemGroup,
   deleteProgressItem,
@@ -390,7 +411,7 @@ export default function ProgressItemGroup({
   updateProgressItemSortOrders,
   updateCompletedInfo,
 }: Props) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [orderedItems, setOrderedItems] = useState(items);
   const [isMounted, setIsMounted] = useState(false);
@@ -405,7 +426,9 @@ export default function ProgressItemGroup({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    })
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -420,7 +443,10 @@ export default function ProgressItemGroup({
 
     const formData = new FormData();
     formData.append("project_id", projectId);
-    formData.append("item_ids", JSON.stringify(newItems.map((item) => item.id)));
+    formData.append(
+      "item_ids",
+      JSON.stringify(newItems.map((item) => item.id))
+    );
     updateProgressItemSortOrders(formData);
   };
 
@@ -442,6 +468,15 @@ export default function ProgressItemGroup({
         </button>
 
         <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+          <button
+            type="button"
+            {...dragAttributes}
+            {...dragListeners}
+            className="h-10 cursor-grab rounded bg-gray-200 px-4 font-bold text-gray-700"
+          >
+            ☰ 並び替え
+          </button>
+
           <button
             type="button"
             onClick={() => setIsEditing(!isEditing)}
@@ -474,11 +509,23 @@ export default function ProgressItemGroup({
           <input type="hidden" name="group_id" value={groupId} />
 
           <div className="grid gap-3 md:grid-cols-2">
-            <input name="new_category" defaultValue={category} className="w-full rounded border p-2" required />
-            <input name="new_section_name" defaultValue={sectionName ?? ""} className="w-full rounded border p-2" />
+            <input
+              name="new_category"
+              defaultValue={category}
+              className="w-full rounded border p-2"
+              required
+            />
+            <input
+              name="new_section_name"
+              defaultValue={sectionName ?? ""}
+              className="w-full rounded border p-2"
+            />
           </div>
 
-          <button type="submit" className="mt-3 rounded bg-black px-4 py-2 text-white">
+          <button
+            type="submit"
+            className="mt-3 rounded bg-black px-4 py-2 text-white"
+          >
             保存
           </button>
         </form>
@@ -486,7 +533,10 @@ export default function ProgressItemGroup({
 
       <div className="mb-3">
         <div className="h-2 rounded bg-gray-200">
-          <div className="h-2 rounded bg-green-500" style={{ width: `${progress}%` }} />
+          <div
+            className="h-2 rounded bg-green-500"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       </div>
 
@@ -507,8 +557,15 @@ export default function ProgressItemGroup({
               ))}
             </div>
           ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={orderedItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedItems.map((item) => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
                 <div className="space-y-3">
                   {orderedItems.map((item) => (
                     <SortableProgressItemRow

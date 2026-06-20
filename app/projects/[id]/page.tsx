@@ -1,7 +1,7 @@
 import Link from "next/link";
 import DeleteProjectButton from "./DeleteProjectButton";
 import { redirect } from "next/navigation";
-import ProgressItemGroup from "./ProgressItemGroup";
+import ProgressGroupList from "./ProgressGroupList";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import WorkerSelector from "./WorkerSelector";
@@ -242,6 +242,31 @@ async function updateProgressItemSortOrders(formData: FormData) {
   revalidatePath(`/projects/${projectId}`);
 }
 
+async function updateProgressGroupSortOrders(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const projectId = formData.get("project_id") as string;
+  const groupIdsText = formData.get("group_ids") as string;
+
+  const groupIds = JSON.parse(groupIdsText) as string[];
+
+  for (const [index, groupId] of groupIds.entries()) {
+    const { error } = await supabase
+      .from("progress_groups")
+      .update({ sort_order: index + 1 })
+      .eq("id", groupId)
+      .eq("project_id", projectId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+}
+
 async function updateCompletedInfo(formData: FormData) {
   "use server";
 
@@ -290,9 +315,8 @@ async function addPaintUsage(formData: FormData) {
     throw new Error(inventoryError.message);
   }
 
-  const currentRemaining = Number(inventory.remaining_amount);
-
-  const usedAmount = usedAll ? currentRemaining : Number(usedAmountText);
+  const remainingBefore = Number(inventory.remaining_amount);
+  const usedAmount = usedAll ? remainingBefore : Number(usedAmountText);
 
   if (!usedAll && (!usedAmountText || usedAmount <= 0)) {
     return;
@@ -300,7 +324,7 @@ async function addPaintUsage(formData: FormData) {
 
   const newRemaining = usedAll
     ? 0
-    : Math.max(currentRemaining - usedAmount, 0);
+    : Math.max(remainingBefore - usedAmount, 0);
 
   const { error: logError } = await supabase.from("paint_usage_logs").insert({
     project_id: projectId,
@@ -308,6 +332,7 @@ async function addPaintUsage(formData: FormData) {
     used_amount: usedAmount,
     used_all: usedAll,
     used_date: new Date().toISOString().slice(0, 10),
+    remaining_before: remainingBefore,
   });
 
   if (logError) {
@@ -341,7 +366,7 @@ async function deletePaintUsage(formData: FormData) {
 
   const { data: usageLog, error: usageLogError } = await supabase
     .from("paint_usage_logs")
-    .select("id, paint_inventory_id, used_amount")
+    .select("id, paint_inventory_id, used_amount, remaining_before")
     .eq("id", usageLogId)
     .single();
 
@@ -360,7 +385,10 @@ async function deletePaintUsage(formData: FormData) {
   }
 
   const restoredAmount =
-    Number(inventory.remaining_amount) + Number(usageLog.used_amount);
+    usageLog.remaining_before !== null &&
+    usageLog.remaining_before !== undefined
+      ? Number(usageLog.remaining_before)
+      : Number(inventory.remaining_amount) + Number(usageLog.used_amount);
 
   const { error: updateError } = await supabase
     .from("paint_inventory")
@@ -408,62 +436,65 @@ export default async function ProjectDetailPage({ params }: PageProps) {
     inventoryResult,
     usageLogsResult,
   ] = await Promise.all([
-  supabase.from("projects").select("*").eq("id", id).single(),
+    supabase.from("projects").select("*").eq("id", id).single(),
 
-  supabase
-    .from("progress_groups")
-    .select("*")
-    .eq("project_id", id)
-    .order("sort_order", { ascending: true }),
+    supabase
+      .from("progress_groups")
+      .select("*")
+      .eq("project_id", id)
+      .order("sort_order", { ascending: true }),
 
-  supabase
-    .from("progress_items")
-    .select("*")
-    .eq("project_id", id)
-    .order("sort_order", { ascending: true }),
+    supabase
+      .from("progress_items")
+      .select("*")
+      .eq("project_id", id)
+      .order("sort_order", { ascending: true }),
 
-  supabase.from("workers").select("*").order("name", { ascending: true }),
+    supabase.from("workers").select("*").order("name", { ascending: true }),
 
-  supabase
-    .from("site_assignments")
-    .select("id, worker_id, work_date, work_amount")
-    .eq("project_id", id)
-    .order("work_date", { ascending: false }),
+    supabase
+      .from("site_assignments")
+      .select("id, worker_id, work_date, work_amount")
+      .eq("project_id", id)
+      .order("work_date", { ascending: false }),
 
-  supabase
-    .from("paint_inventory")
-    .select(`
-      id,
-      can_number,
-      color_name,
-      remaining_amount,
-      paint_products (
-        name
-      )
-    `)
-    .gt("remaining_amount", 0)
-    .order("can_number"),
-
-  supabase
-    .from("paint_usage_logs")
-    .select(`
-      id,
-      used_amount,
-      used_all,
-      used_date,
-      paint_inventory_id,
-      paint_inventory (
+    supabase
+      .from("paint_inventory")
+      .select(
+        `
+        id,
         can_number,
         color_name,
+        remaining_amount,
         paint_products (
           name
         )
+      `
       )
-    `)
-    .eq("project_id", id)
-    .order("used_date", { ascending: false }),
+      .gt("remaining_amount", 0)
+      .order("can_number"),
 
-]);
+    supabase
+      .from("paint_usage_logs")
+      .select(
+        `
+        id,
+        used_amount,
+        used_all,
+        used_date,
+        paint_inventory_id,
+        paint_inventory (
+          can_number,
+          color_name,
+          paint_products (
+            name
+          )
+        )
+      `
+      )
+      .eq("project_id", id)
+      .order("used_date", { ascending: false }),
+  ]);
 
   const { data: project, error: projectError } = projectResult;
   const { data: progressGroups, error: groupsError } = groupsResult;
@@ -471,10 +502,8 @@ export default async function ProjectDetailPage({ params }: PageProps) {
   const { data: workers, error: workersError } = workersResult;
   const { data: siteAssignments, error: siteAssignmentsError } =
     siteAssignmentsResult;
-  const { data: inventory, error: inventoryError } =
-    inventoryResult;
-  const { data: usageLogs, error: usageLogsError } =
-    usageLogsResult;
+  const { data: inventory, error: inventoryError } = inventoryResult;
+  const { data: usageLogs, error: usageLogsError } = usageLogsResult;
 
   if (
     projectError ||
@@ -620,38 +649,26 @@ export default async function ProjectDetailPage({ params }: PageProps) {
 
       <WorkerSelector workers={workerList} />
 
-      <div className="space-y-8">
-        {groupsWithItems.map((group) => {
-          const groupName = group.section_name
-            ? `${group.category} ${group.section_name}`
-            : group.category;
+      <ProgressGroupList
+        projectId={id}
+        groups={groupsWithItems}
+        workers={workerList}
+        addProgressItem={addProgressItem}
+        deleteItemGroup={deleteItemGroup}
+        deleteProgressItem={deleteProgressItem}
+        updateItemMemo={updateItemMemo}
+        updateItemGroup={updateItemGroup}
+        updateProgressItemSortOrders={updateProgressItemSortOrders}
+        updateProgressGroupSortOrders={updateProgressGroupSortOrders}
+        updateCompletedInfo={updateCompletedInfo}
+      />
 
-          return (
-            <ProgressItemGroup
-              key={group.id}
-              projectId={id}
-              groupId={group.id}
-              groupName={groupName}
-              category={group.category}
-              sectionName={group.section_name}
-              items={group.items}
-              workers={workerList}
-              addProgressItem={addProgressItem}
-              deleteItemGroup={deleteItemGroup}
-              deleteProgressItem={deleteProgressItem}
-              updateItemMemo={updateItemMemo}
-              updateItemGroup={updateItemGroup}
-              updateProgressItemSortOrders={updateProgressItemSortOrders}
-              updateCompletedInfo={updateCompletedInfo}
-            />
-          );
-        })}
-      </div>
       <PaintUsageForm
         projectId={id}
         inventory={inventoryList as any}
         addPaintUsage={addPaintUsage}
       />
+
       <section className="mt-6 rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-lg font-bold">使用材料履歴</h2>
 
@@ -692,7 +709,6 @@ export default async function ProjectDetailPage({ params }: PageProps) {
                     削除
                   </button>
                 </form>
-
               </div>
             ))}
           </div>
