@@ -13,6 +13,20 @@ type Profile = {
   role: string;
 };
 
+function loginIdToEmail(loginId: string) {
+  return `${loginId.trim().toLowerCase()}@paint-app.local`;
+}
+
+function emailToDisplayId(email: string | undefined) {
+  if (!email) return "不明";
+
+  if (email.endsWith("@paint-app.local")) {
+    return email.replace("@paint-app.local", "");
+  }
+
+  return email;
+}
+
 async function addWorker(formData: FormData) {
   "use server";
 
@@ -46,13 +60,15 @@ async function createAccount(formData: FormData) {
 
   const adminSupabase = createAdminClient();
 
-  const email = String(formData.get("email") ?? "").trim();
+  const loginId = String(formData.get("login_id") ?? "").trim();
   const password = String(formData.get("password") ?? "").trim();
   const role = String(formData.get("role") ?? "staff");
 
-  if (!email || !password) return;
+  if (!loginId || !password) return;
   if (role !== "admin" && role !== "staff") throw new Error("権限が不正です。");
   if (password.length < 6) throw new Error("パスワードは6文字以上にしてください。");
+
+  const email = loginIdToEmail(loginId);
 
   const { data, error: authError } = await adminSupabase.auth.admin.createUser({
     email,
@@ -169,6 +185,7 @@ export default async function SettingsPage() {
 
     return {
       id: account.id,
+      loginId: emailToDisplayId(account.email),
       email: account.email ?? "メール不明",
       role: accountProfile?.role ?? "staff",
       createdAt: account.created_at,
@@ -189,9 +206,9 @@ export default async function SettingsPage() {
 
           <form action={createAccount} className="space-y-4">
             <input
-              name="email"
-              type="email"
-              placeholder="メールアドレス"
+              name="login_id"
+              type="text"
+              placeholder="ログインID"
               className="w-full rounded border p-2"
               required
             />
@@ -260,7 +277,8 @@ export default async function SettingsPage() {
                 className="flex flex-col gap-3 rounded border p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
-                  <p className="font-bold">{account.email}</p>
+                  <p className="font-bold">ログインID：{account.loginId}</p>
+                  <p className="text-xs text-gray-400">{account.email}</p>
                   <p className="text-sm text-gray-500">
                     登録日：
                     {new Date(account.createdAt).toLocaleDateString("ja-JP")}
@@ -300,6 +318,7 @@ export default async function SettingsPage() {
             ))}
           </div>
         </section>
+
         <section className="rounded-lg border bg-white p-4 shadow-sm lg:col-span-2">
           <h2 className="mb-2 text-xl font-bold">バックアップ</h2>
 
@@ -313,7 +332,7 @@ export default async function SettingsPage() {
           >
             CSVバックアップをダウンロード
           </a>
-      </section>
+        </section>
       </div>
     </main>
   );

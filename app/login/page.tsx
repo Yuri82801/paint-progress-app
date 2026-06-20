@@ -1,21 +1,29 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+function loginIdToEmail(loginId: string) {
+  return `${loginId.trim().toLowerCase()}@paint-app.local`;
+}
+
 async function login(formData: FormData) {
   "use server";
 
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const loginId = String(formData.get("login_id") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!loginId || !password) {
+    throw new Error("ログインIDとパスワードを入力してください。");
+  }
 
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
-    email,
+    email: loginIdToEmail(loginId),
     password,
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error("ログインIDまたはパスワードが違います。");
   }
 
   redirect("/");
@@ -28,25 +36,23 @@ export default function LoginPage() {
 
       <form action={login} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            メールアドレス
-          </label>
+          <label className="mb-1 block text-sm font-medium">ログインID</label>
           <input
-            name="email"
-            type="email"
+            name="login_id"
+            type="text"
             required
+            autoComplete="username"
             className="w-full rounded border p-3"
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium">
-            パスワード
-          </label>
+          <label className="mb-1 block text-sm font-medium">パスワード</label>
           <input
             name="password"
             type="password"
             required
+            autoComplete="current-password"
             className="w-full rounded border p-3"
           />
         </div>
