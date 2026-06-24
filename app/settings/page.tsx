@@ -141,6 +141,34 @@ async function deleteAccount(formData: FormData) {
   revalidatePath("/settings");
 }
 
+async function updateAccountPassword(formData: FormData) {
+  "use server";
+
+  const adminSupabase = createAdminClient();
+
+  const userId = String(formData.get("user_id") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  if (!userId || !password) return;
+
+  if (password.length < 6) {
+    throw new Error("パスワードは6文字以上にしてください。");
+  }
+
+  const { error } = await adminSupabase.auth.admin.updateUserById(
+    userId,
+    {
+      password,
+    }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/settings");
+}
+
 export default async function SettingsPage() {
   const supabase = await createClient();
   const adminSupabase = createAdminClient();
@@ -302,6 +330,26 @@ export default async function SettingsPage() {
                       権限変更
                     </button>
                   </form>
+
+                  <form action={updateAccountPassword} className="flex gap-2">
+                    <input
+                      type="hidden"
+                      name="user_id"
+                      value={account.id}
+                    />
+
+                    <input
+                      type="text"
+                      name="password"
+                      placeholder="新パスワード"
+                      className="rounded border p-2"
+                      required
+                    />
+
+                    <button className="rounded bg-blue-600 px-3 py-2 text-sm text-white">
+                      パスワード変更
+                    </button>
+                </form>
 
                   <form action={deleteAccount}>
                     <input type="hidden" name="user_id" value={account.id} />

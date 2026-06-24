@@ -48,6 +48,17 @@ export default function HomePage() {
                 塗料の在庫登録・残量確認を行います。
               </p>
             </Link>
+            <Link
+              href="/settings"
+              className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <p className="text-lg font-bold text-gray-900">
+                設定
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                アカウント管理・作業者管理を行います。
+              </p>
+            </Link>
           </div>
         </div>
       </div>
