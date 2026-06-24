@@ -170,7 +170,6 @@ export default function PaintInventoryForm({
               }
               placeholder="残量（kg）"
               className="rounded border p-2"
-              required
             />
 
             <input

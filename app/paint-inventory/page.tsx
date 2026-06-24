@@ -8,6 +8,7 @@ type PageProps = {
   searchParams: Promise<{
     q?: string;
     error?: string;
+    stock?: string;
   }>;
 };
 
@@ -50,7 +51,11 @@ async function deleteInventory(formData: FormData) {
 }
 
 export default async function PaintInventoryPage({ searchParams }: PageProps) {
-  const { q = "", error: errorMessage = "" } = await searchParams;
+  const {
+    q = "",
+    error: errorMessage = "",
+    stock = "available",
+  } = await searchParams;
 
   const supabase = await createClient();
 
@@ -77,8 +82,8 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
 
   const sortedInventory =
     inventory?.sort((a, b) => {
-      const aEmpty = Number(a.remaining_amount) <= 0;
-      const bEmpty = Number(b.remaining_amount) <= 0;
+      const aEmpty = a.remaining_amount === 0;
+      const bEmpty = b.remaining_amount === 0;
 
       if (aEmpty !== bEmpty) {
         return aEmpty ? 1 : -1;
@@ -104,6 +109,33 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
       colorName.toLowerCase().includes(keyword)
     );
   });
+
+  const availableInventory = filteredInventory.filter(
+    (item) => item.remaining_amount !== 0
+  );
+
+  const outOfStockInventory = filteredInventory.filter(
+    (item) => item.remaining_amount === 0
+  );
+
+  const tabFilteredInventory =
+    stock === "out"
+      ? outOfStockInventory
+      : stock === "all"
+        ? filteredInventory
+        : availableInventory;
+
+  const makeTabHref = (stockValue: string) => {
+    const params = new URLSearchParams();
+
+    params.set("stock", stockValue);
+
+    if (q.trim()) {
+      params.set("q", q.trim());
+    }
+
+    return `/paint-inventory?${params.toString()}`;
+  };
 
   return (
     <main className="p-4 sm:p-8">
@@ -143,6 +175,8 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
       )}
 
       <form className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <input type="hidden" name="stock" value={stock} />
+
         <input
           type="text"
           name="q"
@@ -166,8 +200,43 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
         </Link>
       </form>
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href={makeTabHref("available")}
+          className={`rounded px-4 py-2 font-bold ${
+            stock === "available"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 text-gray-800"
+          }`}
+        >
+          在庫あり（{availableInventory.length}）
+        </Link>
+
+        <Link
+          href={makeTabHref("out")}
+          className={`rounded px-4 py-2 font-bold ${
+            stock === "out"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 text-gray-800"
+          }`}
+        >
+          在庫切れ（{outOfStockInventory.length}）
+        </Link>
+
+        <Link
+          href={makeTabHref("all")}
+          className={`rounded px-4 py-2 font-bold ${
+            stock === "all"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200 text-gray-800"
+          }`}
+        >
+          全て（{filteredInventory.length}）
+        </Link>
+      </div>
+
       <div className="mb-3 text-sm text-gray-600">
-        表示件数：{filteredInventory.length}件
+        表示件数：{tabFilteredInventory.length}件
       </div>
 
       <div className="overflow-x-auto rounded-lg border bg-white">
@@ -184,7 +253,7 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
           </thead>
 
           <tbody>
-            {filteredInventory.map((item) => {
+            {tabFilteredInventory.map((item) => {
               const inventoryName = `No.${item.can_number} ${
                 (item.paint_products as any)?.name ?? ""
               }`;
@@ -198,9 +267,13 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
                   <td className="p-3">{item.color_name}</td>
 
                   <td className="p-3">
-                    {Number(item.remaining_amount) <= 0 ? (
+                    {item.remaining_amount === 0 ? (
                       <span className="rounded bg-red-100 px-2 py-1 text-sm font-bold text-red-700">
                         在庫切れ
+                      </span>
+                    ) : item.remaining_amount === null ? (
+                      <span className="rounded bg-yellow-100 px-2 py-1 text-sm font-bold text-yellow-700">
+                        残量未確認
                       </span>
                     ) : (
                       <span>{item.remaining_amount}kg</span>
@@ -240,7 +313,7 @@ export default async function PaintInventoryPage({ searchParams }: PageProps) {
               );
             })}
 
-            {filteredInventory.length === 0 && (
+            {tabFilteredInventory.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-6 text-center text-gray-500">
                   該当する在庫はありません。

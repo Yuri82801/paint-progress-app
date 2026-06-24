@@ -54,6 +54,39 @@ async function updatePaintProductStatus(formData: FormData) {
   redirect("/paint-products?success=status");
 }
 
+async function updatePaintProductSortOrder(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+
+  const id = String(formData.get("id") ?? "");
+  const sortOrderText = String(formData.get("sort_order") ?? "").trim();
+
+  if (!id) {
+    return;
+  }
+
+  const sortOrder = sortOrderText === "" ? null : Number(sortOrderText);
+
+  if (sortOrderText !== "" && Number.isNaN(sortOrder)) {
+    redirect("/paint-products?error=sort");
+  }
+
+  const { error } = await supabase
+    .from("paint_products")
+    .update({
+      sort_order: sortOrder,
+    })
+    .eq("id", id);
+
+  if (error) {
+    redirect("/paint-products?error=sort");
+  }
+
+  revalidatePath("/paint-products");
+  redirect("/paint-products?success=sort");
+}
+
 type PageProps = {
   searchParams: Promise<{
     error?: string;
@@ -77,6 +110,7 @@ export default async function PaintProductsPage({ searchParams }: PageProps) {
     .from("paint_products")
     .select("*")
     .order("is_active", { ascending: false })
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("name", { ascending: true });
 
   if (error) {
@@ -121,6 +155,12 @@ export default async function PaintProductsPage({ searchParams }: PageProps) {
         </div>
       )}
 
+      {params.error === "sort" && (
+        <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">
+          表示順の変更中にエラーが発生しました。
+        </div>
+      )}
+
       {params.success === "add" && (
         <div className="mb-4 rounded border border-green-300 bg-green-50 p-3 text-sm font-bold text-green-700">
           塗料を追加しました。
@@ -130,6 +170,12 @@ export default async function PaintProductsPage({ searchParams }: PageProps) {
       {params.success === "status" && (
         <div className="mb-4 rounded border border-green-300 bg-green-50 p-3 text-sm font-bold text-green-700">
           表示状態を変更しました。
+        </div>
+      )}
+
+      {params.success === "sort" && (
+        <div className="mb-4 rounded border border-green-300 bg-green-50 p-3 text-sm font-bold text-green-700">
+          表示順を変更しました。
         </div>
       )}
 
@@ -155,8 +201,11 @@ export default async function PaintProductsPage({ searchParams }: PageProps) {
       </section>
 
       <section className="mb-6 rounded-lg border bg-white">
-        <div className="border-b bg-gray-100 p-3 font-bold">
-          表示中の塗料
+        <div className="border-b bg-gray-100 p-3">
+          <div className="font-bold">表示中の塗料</div>
+          <div className="mt-1 text-xs text-gray-500">
+            表示順は数字が小さいほど在庫登録のプルダウン上部に表示されます。空欄の場合は50音順です。
+          </div>
         </div>
 
         {activeProducts.length > 0 ? (
@@ -164,21 +213,50 @@ export default async function PaintProductsPage({ searchParams }: PageProps) {
             {activeProducts.map((product) => (
               <div
                 key={product.id}
-                className="flex items-center justify-between gap-3 p-3"
+                className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="font-medium">{product.name}</div>
+                <div>
+                  <div className="font-medium">{product.name}</div>
+                  <div className="text-xs text-gray-500">
+                    現在の表示順：{product.sort_order ?? "未設定"}
+                  </div>
+                </div>
 
-                <form action={updatePaintProductStatus}>
-                  <input type="hidden" name="id" value={product.id} />
-                  <input type="hidden" name="is_active" value="false" />
-
-                  <button
-                    type="submit"
-                    className="rounded bg-orange-600 px-3 py-1.5 text-sm text-white"
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <form
+                    action={updatePaintProductSortOrder}
+                    className="flex gap-2"
                   >
-                    非表示
-                  </button>
-                </form>
+                    <input type="hidden" name="id" value={product.id} />
+
+                    <input
+                      type="number"
+                      name="sort_order"
+                      defaultValue={product.sort_order ?? ""}
+                      placeholder="表示順"
+                      className="w-24 rounded border px-2 py-1.5 text-sm"
+                    />
+
+                    <button
+                      type="submit"
+                      className="rounded bg-gray-700 px-3 py-1.5 text-sm text-white"
+                    >
+                      保存
+                    </button>
+                  </form>
+
+                  <form action={updatePaintProductStatus}>
+                    <input type="hidden" name="id" value={product.id} />
+                    <input type="hidden" name="is_active" value="false" />
+
+                    <button
+                      type="submit"
+                      className="rounded bg-orange-600 px-3 py-1.5 text-sm text-white"
+                    >
+                      非表示
+                    </button>
+                  </form>
+                </div>
               </div>
             ))}
           </div>

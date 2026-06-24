@@ -23,8 +23,6 @@ async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  await supabase.auth.signOut();
-
   const { error } = await supabase.auth.signInWithPassword({
     email: loginIdToEmail(loginId),
     password,

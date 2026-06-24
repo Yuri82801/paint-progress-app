@@ -100,7 +100,8 @@ export default async function NewPaintInventoryPage() {
     .from("paint_products")
     .select("id, name")
     .eq("is_active", true)
-    .order("name");
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("name", { ascending: true });
 
   if (error) {
     return <main className="p-8">エラー：{error.message}</main>;

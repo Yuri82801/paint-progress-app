@@ -300,10 +300,17 @@ async function addPaintUsage(formData: FormData) {
 
   const projectId = String(formData.get("project_id") ?? "");
   const paintInventoryId = String(formData.get("paint_inventory_id") ?? "");
-  const usedAmountText = String(formData.get("used_amount") ?? "");
-  const usedAll = formData.get("used_all") === "true";
+  const newRemainingText = String(
+    formData.get("new_remaining_amount") ?? ""
+  ).trim();
 
-  if (!projectId || !paintInventoryId) return;
+  if (!projectId || !paintInventoryId || !newRemainingText) return;
+
+  const newRemaining = Number(newRemainingText);
+
+  if (Number.isNaN(newRemaining) || newRemaining < 0) {
+    return;
+  }
 
   const { data: inventory, error: inventoryError } = await supabase
     .from("paint_inventory")
@@ -315,16 +322,13 @@ async function addPaintUsage(formData: FormData) {
     throw new Error(inventoryError.message);
   }
 
-  const remainingBefore = Number(inventory.remaining_amount);
-  const usedAmount = usedAll ? remainingBefore : Number(usedAmountText);
+  const remainingBefore =
+    inventory.remaining_amount === null ? null : Number(inventory.remaining_amount);
 
-  if (!usedAll && (!usedAmountText || usedAmount <= 0)) {
-    return;
-  }
+  const usedAmount =
+    remainingBefore === null ? null : Math.max(remainingBefore - newRemaining, 0);
 
-  const newRemaining = usedAll
-    ? 0
-    : Math.max(remainingBefore - usedAmount, 0);
+  const usedAll = newRemaining === 0;
 
   const { error: logError } = await supabase.from("paint_usage_logs").insert({
     project_id: projectId,

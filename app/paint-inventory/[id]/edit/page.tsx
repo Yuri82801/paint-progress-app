@@ -18,10 +18,19 @@ async function updateInventory(formData: FormData) {
   const canNumber = String(formData.get("can_number") ?? "").trim();
   const paintProductId = String(formData.get("paint_product_id") ?? "");
   const colorName = String(formData.get("color_name") ?? "").trim();
-  const remainingAmount = String(formData.get("remaining_amount") ?? "");
+  const remainingAmountText = String(
+    formData.get("remaining_amount") ?? ""
+  ).trim();
   const receivedDate = String(formData.get("received_date") ?? "");
 
-  if (!id || !canNumber || !paintProductId || remainingAmount === "") {
+  if (!id || !canNumber || !paintProductId) {
+    return;
+  }
+
+  const remainingAmount =
+    remainingAmountText === "" ? null : Number(remainingAmountText);
+
+  if (remainingAmountText !== "" && Number.isNaN(remainingAmount)) {
     return;
   }
 
@@ -31,7 +40,7 @@ async function updateInventory(formData: FormData) {
       can_number: canNumber,
       paint_product_id: paintProductId,
       color_name: colorName || null,
-      remaining_amount: Number(remainingAmount),
+      remaining_amount: remainingAmount,
       received_date: receivedDate || null,
     })
     .eq("id", id);
@@ -58,16 +67,14 @@ export default async function EditPaintInventoryPage({ params }: PageProps) {
   }
 
   const [inventoryResult, productsResult] = await Promise.all([
-    supabase
-      .from("paint_inventory")
-      .select("*")
-      .eq("id", id)
-      .single(),
+    supabase.from("paint_inventory").select("*").eq("id", id).single(),
 
     supabase
       .from("paint_products")
       .select("id, name")
-      .order("name"),
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      .order("name", { ascending: true }),
   ]);
 
   const { data: inventory, error: inventoryError } = inventoryResult;
@@ -89,7 +96,10 @@ export default async function EditPaintInventoryPage({ params }: PageProps) {
 
       <h1 className="mt-4 mb-6 text-3xl font-bold">在庫編集</h1>
 
-      <form action={updateInventory} className="max-w-xl space-y-4 rounded-lg border bg-white p-4 shadow-sm">
+      <form
+        action={updateInventory}
+        className="max-w-xl space-y-4 rounded-lg border bg-white p-4 shadow-sm"
+      >
         <input type="hidden" name="id" value={inventory.id} />
 
         <div>
@@ -117,6 +127,9 @@ export default async function EditPaintInventoryPage({ params }: PageProps) {
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-gray-500">
+            非表示にした塗料は候補に表示されません。
+          </p>
         </div>
 
         <div>
@@ -134,10 +147,13 @@ export default async function EditPaintInventoryPage({ params }: PageProps) {
             type="number"
             step="0.1"
             name="remaining_amount"
-            defaultValue={inventory.remaining_amount}
+            defaultValue={inventory.remaining_amount ?? ""}
+            placeholder="空欄にすると残量未確認"
             className="w-full rounded border p-2"
-            required
           />
+          <p className="mt-1 text-xs text-gray-500">
+            残量が分からない場合は空欄のまま保存できます。
+          </p>
         </div>
 
         <div>

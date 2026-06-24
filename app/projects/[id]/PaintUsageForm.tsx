@@ -6,7 +6,7 @@ type Inventory = {
   id: string;
   can_number: string;
   color_name: string | null;
-  remaining_amount: number;
+  remaining_amount: number | null;
   paint_products: {
     name: string;
   } | null;
@@ -35,11 +35,7 @@ export default function PaintUsageForm({
       (item) => String(item.can_number) === value.trim()
     );
 
-    if (matchedInventory) {
-      setSelectedId(matchedInventory.id);
-    } else {
-      setSelectedId("");
-    }
+    setSelectedId(matchedInventory?.id ?? "");
   };
 
   const handleSelectChange = (value: string) => {
@@ -55,12 +51,7 @@ export default function PaintUsageForm({
 
       <form action={addPaintUsage} className="space-y-3">
         <input type="hidden" name="project_id" value={projectId} />
-
-        <input
-          type="hidden"
-          name="paint_inventory_id"
-          value={selectedId}
-        />
+        <input type="hidden" name="paint_inventory_id" value={selectedId} />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -89,8 +80,10 @@ export default function PaintUsageForm({
               {inventory.map((item) => (
                 <option key={item.id} value={item.id}>
                   No.{item.can_number} / {item.paint_products?.name} /{" "}
-                  {item.color_name || "色名なし"} / 残量
-                  {item.remaining_amount}kg
+                  {item.color_name || "色名なし"} /{" "}
+                  {item.remaining_amount === null
+                    ? "残量未確認"
+                    : `残量${item.remaining_amount}kg`}
                 </option>
               ))}
             </select>
@@ -108,23 +101,30 @@ export default function PaintUsageForm({
             <p>缶No.：{selected.can_number}</p>
             <p>塗料名：{selected.paint_products?.name}</p>
             <p>色名：{selected.color_name || "未入力"}</p>
-            <p>残量：{selected.remaining_amount}kg</p>
+            <p>
+              現在の登録残量：
+              {selected.remaining_amount === null
+                ? "未確認"
+                : `${selected.remaining_amount}kg`}
+            </p>
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-bold text-gray-700">
+            使用後の残量
+          </label>
           <input
             type="number"
             step="0.1"
-            name="used_amount"
-            placeholder="使用量（kg）"
-            className="rounded border p-2"
+            name="new_remaining_amount"
+            placeholder="計測した残量（kg）"
+            className="w-full rounded border p-2"
+            required
           />
-
-          <label className="flex items-center gap-2 rounded border p-2">
-            <input type="checkbox" name="used_all" value="true" />
-            使い切り
-          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            職人さんが計測した「使用後の残量」を入力してください。
+          </p>
         </div>
 
         <button
@@ -132,7 +132,7 @@ export default function PaintUsageForm({
           disabled={!selectedId}
           className="rounded bg-blue-600 px-4 py-2 font-semibold text-white disabled:bg-gray-300"
         >
-          使用材料を登録
+          使用後の残量を登録
         </button>
       </form>
     </section>
