@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+type PageProps = {
+  searchParams?: Promise<{
+    error?: string;
+  }>;
+};
+
 function loginIdToEmail(loginId: string) {
   return `${loginId.trim().toLowerCase()}@paint-app.local`;
 }
@@ -12,10 +18,12 @@ async function login(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   if (!loginId || !password) {
-    throw new Error("ログインIDとパスワードを入力してください。");
+    redirect("/login?error=1");
   }
 
   const supabase = await createClient();
+
+  await supabase.auth.signOut();
 
   const { error } = await supabase.auth.signInWithPassword({
     email: loginIdToEmail(loginId),
@@ -23,16 +31,25 @@ async function login(formData: FormData) {
   });
 
   if (error) {
-    throw new Error("ログインIDまたはパスワードが違います。");
+    redirect("/login?error=1");
   }
 
   redirect("/");
 }
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps) {
+  const params = searchParams ? await searchParams : {};
+  const hasError = params?.error === "1";
+
   return (
     <main className="mx-auto max-w-md p-8">
       <h1 className="mb-6 text-2xl font-bold">ログイン</h1>
+
+      {hasError && (
+        <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">
+          ログインIDまたはパスワードが違います。
+        </div>
+      )}
 
       <form action={login} className="space-y-4">
         <div>
